@@ -59,25 +59,42 @@
 
 ### `search_listings`
 
-- **What it does:**
+- **What it does:** 
+Searches the listings data for items matching the user's description and optionally filters the results by size and maximum price.
+
 - **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
+`description` (str), `size` (str | None), `max_price` (float | None). Size matching is case-insensitive and should match the size component of a listing without confusing unrelated characters in other size formats.
+
 - **Returns:**
+ list of matching listing dicts, best match first, up to the configured search result limit. Each dict contains `id`, `title`, `description`, `category`, `style_tags` (list), `size`, `condition`, `price` (float), `colors` (list), `brand` (str or None), and `platform`.
+
 - **When it has nothing:**
+Returns an empty list `[]` when no listings match.
 
 ### `suggest_outfit`
 
 - **What it does:**
+Suggests one or two outfits for the selected thrift listing using items from the user's wardrobe when available.
+
 - **Inputs:**
+`new_item` (dict), `wardrobe` (dict containing an `items` list).
+
 - **Returns:**
+A non-empty string containing one or two outfit suggestions; when wardrobe items are available, the suggestions name specific pieces the user already owns.
+
 - **When it has nothing:**
+If `wardrobe["items"]` is empty, returns a non-empty string containing general styling advice for the new item instead of failing or returning an empty string.
 
 ### `create_fit_card`
 
 - **What it does:**
+Creates a short, post-style caption describing the selected thrift item and suggested outfit.
 - **Inputs:**
+ `outfit` (str), `new_item` (dict).
 - **Returns:**
+A two-to-four sentence caption that mentions the item, its price, and its platform once each and describes the outfit's vibe.
 - **When it has nothing:**
-
+If `outfit` is empty or contains only whitespace, returns a descriptive message instead of raising an error.
 ---
 
 ## Planning Loop
@@ -94,6 +111,7 @@
      function have to be real. -->
 
 **Branch rule:**
+If `search_listings` returns an empty list, put a message in the session and stop. Otherwise, take the first result, store it as the selected item, and continue to `suggest_outfit`.
 
 **Where it lives:** `agent.py::run_agent`
 
