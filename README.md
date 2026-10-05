@@ -40,7 +40,7 @@
 ## What This Does
 
 <!-- Three or four sentences: what a user asks for, and what they get back. -->
-
+FitFindr helps users search for thrift clothing based on a description, size, and maximum price. It searches available listings and selects a matching item. It then uses the user's wardrobe to suggest outfits that pair with the selected item and creates a short fit-card caption. If no listings match the search, FitFindr stops and suggests ways the user can adjust their search.
 
 
 ---
@@ -117,7 +117,10 @@ If `search_listings` returns an empty list, put a message in the session and sto
 
 **How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
 
+The query is parsed using regular expressions (regex) to extract the size and maximum price. Those parts are removed from the query, and the remaining text is used as the item description.
+
 **What moves through the session:** <!-- which fields, in what order -->
+The parsed query is stored in `session["parsed"]`, then the search results are stored in `session["search_results"]`. The first result is stored in `session["selected_item"]`, the outfit recommendation is stored in `session["outfit_suggestion"]`, and the final caption is stored in `session["fit_card"]`.
 
 ---
 
@@ -131,26 +134,66 @@ If `search_listings` returns an empty list, put a message in the session and sto
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask "looking for a vintage graphic tee under 30"
+
+Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+Outfit:   Here are two outfit ideas combining the Y2K butterfly baby tee with pieces from your wardrobe:
+
+### Outfit 1: Classic Y2K Streetwear
+* **Bottoms:** Baggy straight-leg jeans, dark wash (`w_001`)
+* **Shoes:** Chunky white sneakers (`w_007`)
+* **Accessories:** Black crossbody bag (`w_010`)
+
+**Why it works:** The fitted, cropped silhouette of the baby tee creates a great proportion balance when paired with high-waisted, baggy dark-wash jeans. Finish the look with chunky sneakers and a minimal black bag for an effortless, authentic early-2000s streetwear vibe.
+
+---
+
+### Outfit 2: Edgy Contrast Look
+* **Outerwear:** Vintage black denim jacket (`w_006`)
+* **Shoes:** Black combat boots (`w_008`)
+* **Bottoms:** Wide-leg khaki trousers (`w_002`)
+
+**Why it works:** This outfit plays with contrasting aesthetics. The sweet, pastel butterfly print of the baby tee pops against the tougher elements of the black denim jacket and combat boots, while the khaki trousers ground the look with a relaxed, earthy contrast.
+
+Fit card: Channeling all the early 2000s streetwear vibes in this Y2K Baby Tee — Butterfly Print, styled with baggy denim and chunky sneakers for an effortless throwback look. Snagged this gem for just $18 over on Depop before it found a new home! 🦋✨
+
+2 model calls this session, 1229 prompt + 318 output tokens
 
 ```
 
 **The three tools, tested one at a time**
 
 ```
-$ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
-
+```
+$ python -c "from tools import search_listings; print([(x['id'], x['title'], x['price']) for x in search_listings('graphic tee', max_price=30)])"
+[('lst_002', 'Y2K Baby Tee — Butterfly Print', 18.0), ('lst_006', 'Graphic Tee — 2003 Tour Bootleg Style', 24.0), ('lst_017', 'Mesh Long-Sleeve Top — Black', 15.0), ('lst_033', 'Vintage Band Tee — Faded Grey', 19.0), ('lst_011', 'Low-Rise Cargo Pants — Khaki', 27.0), ('lst_012', 'Oversized Crewneck Sweatshirt — Vintage Navy', 20.0), ('lst_015', 'Vintage Graphic Hoodie — Faded Black', 26.0)]
 ```
 
 ```
-$ python -c "from tools import suggest_outfit; ..."
+$ python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+Here are two outfit ideas combining the vintage Levi's 501s with pieces from your wardrobe:
 
+**Outfit 1: Casual Streetwear (High-Low Contrast)**
+* **Top:** White ribbed tank top (`w_003`) tucked in to highlight the waist of the 501s.
+* **Outerwear:** Oversized grey crewneck sweatshirt (`w_004`) layered on top for a relaxed, cozy silhouette.
+* **Shoes:** Chunky white sneakers (`w_007`).
+* **Accessories:** Black crossbody bag (`w_010`).
+* why it works:* The medium wash of the thrifted jeans provides a nice contrast to your dark wash jeans (`w_001`), and pairing a fitted tank with an oversized crewneck creates a balanced, effortless streetwear look.
+
+**Outfit 2: Edgy & Cropped**
+* **Top:** Black cropped zip hoodie (`w_005`).
+* **Outerwear:** Vintage black denim jacket (`w_006`) worn over the hoodie for a layered denim-on-denim texture.
+* **Shoes:** Black combat boots (`w_008`).
+* **Accessories:** Brown leather belt (`w_009`) to tie in the vintage aesthetic.
+* Why it works:* The straight-leg fit of the Levi's 501s balances the cropped layers up top, while the black boots and jacket give the classic medium-wash denim a tougher, vintage-grunge edge.
 ```
 
 ```
-$ python -c "from tools import create_fit_card; ..."
-
+$ python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
+Nothing beats the effortless cool of broken-in denim, especially when it's a pair of Vintage Levi's 501 Jeans — Medium Wash. Just style these with your favorite white sneakersfor an easy, laid-back streetwear vibe that goes with literally everything. Grab them on Depop for just $38.00 before someone else snags 'em!
 ```
+
 
 ---
 
@@ -166,14 +209,30 @@ $ python -c "from tools import create_fit_card; ..."
 **Moment 1**
 
 - *What I asked for:*
+
+I asked AI for help implementing `search_listings` based on the tool requirements, including filtering by maximum price and size and matching keywords from the user's description.
+
 - *What came back:*
+
+AI suggested loading the listings with the provided data loader, applying the price and size filters, and scoring listings based on keyword overlap.
+
 - *What I changed:*
+
+implemented the suggested logic in `tools.py` and tested it from the terminal. I also tested a search with no matching results to make sure the function returned an empty list `[]` as required.
+
 
 **Moment 2**
 
 - *What I asked for:*
+
+I asked AI for help connecting the three tools in `run_agent()` while keeping the results in the session state.
+
 - *What came back:*
+AI suggested storing the search results in `session["search_results"]`, checking whether that list was empty, selecting the first result, and then passing the stored values through `suggest_outfit` and `create_fit_card`.
+
 - *What I changed:*
+
+I added the branch so an empty search stops the agent before the other tools run. I also changed the error message to tell the user to try increasing the budget, changing the size, or changing the item description instead of only saying there were no results.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
