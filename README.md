@@ -541,13 +541,37 @@ I added tracing to record the order of tool calls and show the agent's decision-
 
 ### Run Log — After
 
-| Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
-|---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+## The Improvement
+
+**What I changed:**
+
+I updated `generate.py` to retry temporary Gemini `503 UNAVAILABLE` errors using the existing retry and exponential-backoff mechanism. Previously, only rate-limit errors were retried, while `503` errors immediately caused `ModelUnavailable`.
+
+**Which failure it was meant to fix:**
+
+The baseline evaluation showed that model-dependent tools frequently failed, preventing the agent from completing `suggest_outfit` and `create_fit_card`. This improvement was intended to make the agent more resilient to temporary model service outages.
+
+### Run Log — After
+
+Command: `python run_eval.py --label after`
+
+The after-evaluation was attempted twice but could not be completed because model requests were taking an excessive amount of time. The evaluation was stopped after troubleshooting, and no complete after-run results file was generated.
+
+Observed partial results:
+
+| Attempt | Observation | Outcome |
+|---|---|---|
+| First evaluation | The agent completed `suggest_outfit` and `create_fit_card` and generated a 308-character fit card. | One successful workflow |
+| Second evaluation, first recorded try | The agent completed `suggest_outfit` but then entered `model_unavailable` before completing `create_fit_card`. | Failed to complete workflow |
+
+**Did it help, and how do I know:**
+
+The improvement showed a promising result because one workflow successfully completed all required tools, compared with zero successful completions in the baseline. However, another attempt still failed because the model became unavailable.
+
+Because the full after-evaluation did not finish, I cannot determine whether the improvement consistently met the five evaluation criteria. The results suggest possible improvement, but they are inconclusive.
+
+The remaining limitation is dependence on Gemini API availability and response time. Retrying temporary errors cannot guarantee that the service will respond successfully.
+
 
 **Did it help, and how do I know:**
 
