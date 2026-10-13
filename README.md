@@ -588,7 +588,60 @@ The remaining limitation is dependence on Gemini API availability and response t
      you did. "I ran out of time" is fine if it's true. Pretending nothing is
      left is not. -->
 
+### What's Still Broken
 
+The improvement in Milestone 5 addressed temporary Gemini `503 UNAVAILABLE` errors by adding retry handling. However, the full after-evaluation could not be completed because model requests were taking too long. The following limitations remain.
+
+**Criterion 1 — Matching query completes all three tools (Missed)**
+
+The baseline result was 0/5. During the after-evaluation, one attempt successfully completed the workflow, but another stopped when the model became unavailable.
+
+To improve this, I would investigate Gemini API availability and request timeouts, then repeat the full evaluation to determine whether the retry mechanism consistently improves completion rates.
+
+**Criterion 2 — Impossible query stops early (Met)**
+
+This criterion passed 5/5 in the baseline. The agent correctly stops when no listings are found. No additional improvement is currently needed.
+
+**Criterion 3 — Selected item consistency (Met in supplementary verification)**
+
+The selected item ID matched the item passed to `suggest_outfit` in all five supplementary tests. These tests used mocked model-dependent calls rather than the original live-model evaluation.
+
+I would improve the evaluation logging to show the selected and passed item IDs directly, allowing this behavior to be verified without separate tests.
+
+**Criterion 4 — Fit card content (Missed)**
+
+The baseline result was 0/5 because the agent could not consistently reach `create_fit_card`.
+
+I would first resolve the model availability problem and complete the evaluation. After that, I would review the generated fit cards and adjust the prompt if necessary to ensure each card contains 2–4 sentences and mentions the item, price, and platform.
+
+**Criterion 5 — Empty wardrobe advice (Missed)**
+
+The baseline result was 0/5 because model availability errors prevented reliable completion.
+
+I would test the empty-wardrobe scenario after the model connection becomes reliable and verify that the agent produces general styling advice without requiring existing wardrobe items.
+
+**Why I stopped here**
+
+I focused on one improvement as required by Milestone 5. I attempted the after-evaluation twice, but repeated model delays prevented a complete run. Rather than introducing additional changes without reliable measurements, I documented the partial results and remaining limitations.
+
+### MCP Migration
+
+I moved the listing search functionality to an MCP server and updated the agent to call `search_listings` through the MCP client instead of calling the search function directly.
+
+The main change was how the agent accessed the listing search tool. The search results and agent decision-making behavior remained consistent: matching queries returned listings, while impossible queries triggered the early-stop branch.
+
+The MCP migration separated the listing search capability from the agent's orchestration logic. It did not resolve the Gemini API availability issues affecting the model-dependent tools.
+
+
+### How I Used AI
+
+I used AI to help interpret the assignment requirements, understand the evaluation results, and diagnose why certain criteria were failing.
+
+AI helped me identify that `generate.py` retried rate-limit errors but did not retry temporary Gemini `503 UNAVAILABLE` errors. I used this guidance to implement one improvement using the existing retry and exponential-backoff mechanism.
+
+I also used AI to interpret the partial after-evaluation results and organize my README documentation, including the criterion verdicts, failure diagnoses, and remaining limitations.
+
+I reviewed the suggested changes and ran the evaluation commands in my local development environment.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
