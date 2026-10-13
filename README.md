@@ -385,17 +385,85 @@ that produced it:
      Look for a pattern. Three misses on the same tool is one problem, not
      three. -->
 
+
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Matching query completes all three tools | 4 of 5 | MISSED (0/5) | All five attempts failed to complete the full tool sequence because model availability errors interrupted execution. |
+| 2 | Impossible query stops before second tool | 5 of 5 | MET (5/5) | All five attempts returned a helpful message and stopped before calling suggest_outfit. |
+| 3 | Selected item ID matches item passed to suggest_outfit | 5 of 5 | MET (5/5 supplementary tests) | Five additional tests with mocked model calls confirmed that the selected item ID matched the ID passed to suggest_outfit. |
+| 4 | Fit card has 2–4 sentences and mentions item, price, and platform | 4 of 5 | MISSED (0/5) | None of the five baseline attempts returned a completed fit card because model generation failed. |
+| 5 | Empty wardrobe returns general styling advice | 5 of 5 | MISSED (0/5) | All five attempts failed to return styling advice because the Gemini model request was unsuccessful. |
+
 
 **Diagnoses**
 
+### Criterion 1 — Matching Query Completes All Three Tools
 
+**Target:** 4 of 5
+**Result:** 0 of 5
+**Verdict: MISSED**
+
+The matching query successfully called `search_listings` through MCP and selected an item. However, the agent did not consistently complete the `suggest_outfit` and `create_fit_card` steps.
+
+**Failure step:** Model-dependent tool execution in `suggest_outfit` or `create_fit_card`.
+
+**Mechanism:** A direct diagnostic request to Gemini returned `503 UNAVAILABLE`, indicating that the model was experiencing high demand. The `generate.py` adapter handles rate-limit retries but does not retry temporary `503` service errors. Consequently, `ModelUnavailable` stopped the agent before it could complete all three tools.
+
+### Criterion 2 — Impossible Query Stops Early
+
+**Target:** 5 of 5  
+**Result:** 5 of 5  
+**Verdict: MET**
+
+All five attempts returned an empty search result, followed by a helpful message suggesting that the user increase the budget, change the size, or modify the item description. The agent returned before calling `suggest_outfit`.
+
+**Reason:** The empty-results branch in `agent.py::run_agent` worked correctly in all five attempts.
+
+### Criterion 3 — Selected Item State Consistency
+
+**Target:** 5 of 5  
+**Result:** 5 of 5 supplementary mocked tests  
+**Verdict: MET in supplementary verification**
+
+The original evaluation trace did not expose both item IDs, so it was insufficient to score this criterion directly.
+
+Five supplementary tests used the real `run_agent` and MCP search, with mocked `suggest_outfit` and `create_fit_card` functions. Each test captured the actual item ID passed to `suggest_outfit` and compared it with `session["selected_item"]["id"]`.
+
+All five comparisons passed with the ID `lst_002`.
+
+**Reason:** `agent.py::run_agent` consistently passed the selected item from session state into `suggest_outfit`. This result verifies state consistency independently of Gemini availability.
+
+### Criterion 4 — Fit Card Content
+
+**Target:** 4 of 5  
+**Result:** 0 of 5  
+**Verdict: MISSED**
+
+None of the five baseline attempts produced a completed fit card that could be evaluated against the requirements of 2–4 sentences mentioning the item, price, and platform.
+
+**Failure step:** Model-dependent outfit generation or fit-card generation.
+
+**Mechanism:** Gemini availability errors interrupted the agent before a completed fit card could be returned. This was an execution failure, not evidence that the fit-card prompt produced incorrectly formatted text.
+
+### Criterion 5 — Empty Wardrobe Styling Advice
+
+**Target:** 5 of 5  
+**Result:** 0 of 5  
+**Verdict: MISSED**
+
+The empty-wardrobe scenario successfully found and selected an item but did not return general styling advice.
+
+**Failure step:** `suggest_outfit` model generation.
+
+**Mechanism:** The empty-wardrobe branch in `tools.py` constructs a prompt requesting general styling advice, but the Gemini model request failed. Therefore, the tool could not return the required suggestion.
+
+### Pattern Across the Misses
+
+Criteria 1, 4, and 5 share a common failure mechanism: temporary Gemini model unavailability. The search tool and early-stop branch operated successfully, and supplementary testing verified that the selected item was passed correctly through session state.
+
+The recurring problem is in the model execution layer, particularly the lack of retry handling for temporary `503 UNAVAILABLE` responses.
+
+**Potential improvement:** Extend `generate.py` to retry temporary `503` errors with bounded exponential backoff, while preserving the existing friendly error handling if all retries fail. Rerun the same evaluation scenarios afterward to compare results against the baseline.
 
 ---
 
@@ -456,9 +524,6 @@ I moved `search_listings` from a direct function call in `tools.py` to an MCP to
 The search behavior remained the same, but the architecture changed. The agent communicates with the search tool through MCP rather than calling the Python function directly.
 
 I added tracing to record the order of tool calls and show the agent's decision-making process. When the search returns no results, the agent stops and provides a helpful message instead of continuing to outfit generation.
-
-
-
 
 
 ---
