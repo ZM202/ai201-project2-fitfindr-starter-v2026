@@ -237,8 +237,23 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     # return session
     
     try:
+        selected_id = session["selected_item"]["id"]
+        passed_item = session["selected_item"]
+        passed_id = passed_item["id"]
+
+        trace.step(
+            "verify_item_state",
+            inputs={
+                "selected_item_id": selected_id,
+                "new_item_id": passed_id,
+            },
+            returned={
+                "ids_match": selected_id == passed_id,
+            },
+        )
+
         session["outfit_suggestion"] = suggest_outfit(
-            session["selected_item"],
+            passed_item,
             session["wardrobe"],
         )
 

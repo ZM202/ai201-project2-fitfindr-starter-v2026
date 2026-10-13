@@ -243,6 +243,96 @@ I added the branch so an empty search stops the agent before the other tools run
 
 ## Run Log — Before
 
+### Actual Test Output — Before
+
+
+**Criterion 1 — Matching query completes all three tools**
+
+Source: `run_eval.py::run_once`, executing `agent.py::run_agent`
+
+```text
+[2] search_listings (via MCP)
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[3] select_item
+      out: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      →    branch: results found, continuing
+[4] suggest_outfit
+      out: Here are two outfit suggestions combining the Y2K butterfly baby tee with pieces from your wardrobe:  ### Outf…
+[5] model_unavailable
+      →    stopping because the model could not be reached
+```
+
+**Criterion 2 — Impossible query stops early**
+
+Source: `run_eval.py::run_once`, executing `agent.py::run_agent`
+
+```text
+[2] search_listings (via MCP)
+      out: [] (empty)
+[3] check_search_results
+      out: I couldn't find a matching item. Try increasing your budget, changing the size, or using a different style or …
+      →    branch: empty, stopping
+```
+
+**Criterion 3 — Selected item state consistency**
+
+Source: `run_eval.py::run_once`, executing `agent.py::run_agent`
+
+```text
+[3] select_item
+      out: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      →    branch: results found, continuing
+[4] suggest_outfit
+      in:  dict with keys: new_item, wardrobe
+      out: Here are two outfit suggestions combining the Y2K butterfly baby tee with pieces from your wardrobe:  ### Outf…
+```
+
+This shows the selected item and a successful outfit suggestion, but it does not display the two IDs needed to verify criterion 3.
+
+
+
+
+
+**Supplementary State Consistency Verification**
+
+I ran five additional tests using the real `run_agent()` and MCP `search_listings` tool. I mocked `suggest_outfit` and `create_fit_card` to avoid Gemini availability issues and capture the actual item ID passed to `suggest_outfit`.
+
+```text
+Try 1: PASS - selected=lst_002, passed=lst_002
+Try 2: PASS - selected=lst_002, passed=lst_002
+Try 3: PASS - selected=lst_002, passed=lst_002
+Try 4: PASS - selected=lst_002, passed=lst_002
+Try 5: PASS - selected=lst_002, passed=lst_002
+```
+
+Result: 5/5 PASS. The selected item was passed consistently to `suggest_outfit` in all five supplementary tests.
+
+
+**Criterion 4 — Fit card content**
+
+Source: `run_eval.py::run_once`, executing `agent.py::run_agent`
+
+```text
+[3] select_item
+      out: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+[4] model_unavailable
+      →    stopping because the model could not be reached
+```
+
+**Criterion 5 — Empty wardrobe**
+
+Source: `run_eval.py::run_once`, executing `agent.py::run_agent`
+
+```text
+empty wardrobe  (empty wardrobe)
+  query: vintage graphic tee under $30
+[3] select_item
+      out: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+[4] model_unavailable
+      →    stopping because the model could not be reached
+```
+
+
 <!-- Five criteria, five tries each, in this exact format.
 
      Five, because your criteria are written out of five. Mark each try PASS
@@ -252,13 +342,21 @@ I added the branch so an empty search stops the agent before the other tools run
      `python run_eval.py --label before` runs everything and writes the table
      into results/. Paste it here and fill in the verdicts. -->
 
+
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes all three tools | 4 of 5 | FAIL | FAIL | FAIL | FAIL | FAIL | MISSED (0/5) |
+| 2. Impossible query stops before second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Selected item ID matches item passed to suggest_outfit | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5, mocked model calls) |
+| 4. Fit card has 2–4 sentences and mentions item, price, and platform | 4 of 5 | FAIL | FAIL | FAIL | FAIL | FAIL | MISSED (0/5) |
+| 5. Empty wardrobe returns general styling advice | 5 of 5 | FAIL | FAIL | FAIL | FAIL | FAIL | MISSED (0/5) |
+
+
+During the baseline evaluation, I ran five scenarios five times each with caching disabled using `python run_eval.py --label before`. The impossible-query scenario passed all five attempts because the agent stopped before calling `suggest_outfit` and returned a helpful message.
+
+However, the model-dependent scenarios repeatedly failed because Gemini was unavailable. A separate diagnostic test returned `503 UNAVAILABLE`, indicating that the model was experiencing high demand. Although the agent handled the errors without crashing, it could not consistently generate outfit suggestions or fit cards. This prevented criteria 1, 4, and 5 from meeting their targets.
+
+Criterion 3 requires additional verification to confirm that the selected item's ID matches the ID passed to `suggest_outfit`.
 
 **Real output from one try**, pasted as text, naming the file and function
 that produced it:

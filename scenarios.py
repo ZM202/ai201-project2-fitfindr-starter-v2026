@@ -13,28 +13,45 @@ Three scenarios are filled in to show the shape. Add or change whatever your
 own criteria need — these are a starting point, not a fixed set.
 """
 
+
 SCENARIOS = [
     {
-        # A query the data can match. Criterion 1.
+        # Criterion 1: Matching query completes all three tools.
         "name": "matching query completes",
         "query": "vintage graphic tee under $30",
         "wardrobe": "example",
         "criterion": 1,
     },
     {
-        # A query nothing can match. Criterion 2 — the branch.
+        # Criterion 2: Impossible query stops before suggest_outfit.
         "name": "impossible query stops early",
         "query": "designer ballgown size XXS under $5",
         "wardrobe": "example",
         "criterion": 2,
     },
     {
-        # A user with nothing saved. One of unit 4's three failure modes.
-        "name": "empty wardrobe",
-        "query": "denim jacket under $50",
-        "wardrobe": "empty",
-        "criterion": None,
+        # Criterion 3: Selected item stays consistent in session.
+        "name": "selected item state consistency",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 3,
     },
+    {
+        # Criterion 4: Fit card includes required details.
+        "name": "fit card content",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        # Criterion 5: Empty wardrobe returns styling advice.
+        "name": "empty wardrobe",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "empty",
+        "criterion": 5,
+    },
+]
+
     # TODO: add what your criteria 3, 4 and 5 need.
     #
     # Set "criterion" to the number in criteria.md that the scenario tests.
@@ -47,7 +64,6 @@ SCENARIOS = [
     # For a fit-card criterion, you probably want the SAME query listed more
     # than once, or several different items, depending on what your criterion
     # actually says.
-]
 
 WARDROBES = ("example", "empty")
 
