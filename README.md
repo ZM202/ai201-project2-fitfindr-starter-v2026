@@ -315,20 +315,51 @@ that produced it:
 
 **Happy path**
 
-```
+```text
+$ python app.py ask 'vintage graphic tee under $30' --trace
 
+[1] parse_query
+      in:  dict with keys: query
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[3] select_item
+      out: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      →    branch: results found, continuing
+[4] suggest_outfit
+      in:  dict with keys: new_item, wardrobe
+      out: Here are two outfit suggestions combining the **Y2K Baby Tee** with pieces from your wardrobe:  ### Outfit 1: …
+[5] create_fit_card
+      in:  dict with keys: outfit, new_item
+      out: Channeling major early-2000s energy with this super cute Y2K Baby Tee — Butterfly Print! Styled here with bagg
 ```
 
 **Empty search**
 
+```text
+$ python app.py ask 'designer ballgown size XXS under $5' --trace
+
+[1] parse_query
+      in:  dict with keys: query
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+[3] check_search_results
+      out: I couldn't find a matching item. Try increasing your budget, changing the size, or using a different style or …
+      →    branch: empty, stopping
 ```
 
-```
+**On the MCP move:**
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+I moved `search_listings` from a direct function call in `tools.py` to an MCP tool exposed through `mcp_server.py`. The agent now calls the search tool through `mcp_client.py` using `call_tool()`.
+
+The search behavior remained the same, but the architecture changed. The agent communicates with the search tool through MCP rather than calling the Python function directly.
+
+I added tracing to record the order of tool calls and show the agent's decision-making process. When the search returns no results, the agent stops and provides a helpful message instead of continuing to outfit generation.
+
+
 
 
 

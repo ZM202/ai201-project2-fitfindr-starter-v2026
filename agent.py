@@ -107,6 +107,8 @@ def run_agent(query: str, wardrobe: dict) -> dict:
       • A handler for ModelUnavailable, so a bad key produces a message rather
         than a stack trace. The import is already at the top of this file.
     """
+    trace.start_trace()
+    
     session = new_session(query, wardrobe)
     
     count = 1
@@ -142,39 +144,141 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         "max_price": max_price,
     }
     
-    # session["search_results"] = search_listings(
-    #     session["parsed"]["description"],
-    #     session["parsed"]["size"],
-    #     session["parsed"]["max_price"],
+    trace.step(
+    "parse_query",
+    inputs={"query": query},
+    returned=session["parsed"],
+    )
+    
+    # trace.step(
+    #     "search_listings",
+    #     inputs={
+    #         "description": session["parsed"]["description"],
+    #         "size": session["parsed"]["size"],
+    #         "max_price": session["parsed"]["max_price"],
+    #     },
+    #     returned=session["search_results"],
     # )
     
     session["search_results"] = call_tool(
-    "search_listings",
-    {
-        "description": session["parsed"]["description"],
-        "size": session["parsed"]["size"],
-        "max_price": session["parsed"]["max_price"],
-    },
-)
+        "search_listings",
+        {
+            "description": session["parsed"]["description"],
+            "size": session["parsed"]["size"],
+            "max_price": session["parsed"]["max_price"],
+        },
+    )
+    
+    trace.step(
+        "search_listings (via MCP)",
+        inputs=session["parsed"],
+        returned=session["search_results"],
+    )
     
     if not session["search_results"]:
         session["error"] = (
             "I couldn't find a matching item. Try increasing your budget, "
             "changing the size, or using a different style or item description."
         )
+        
+        trace.step(
+            "check_search_results",
+            returned=session["error"],
+            note="branch: empty, stopping",
+        )
+        
         return session
     
     session["selected_item"] = session["search_results"][0]
     
-    session["outfit_suggestion"] = suggest_outfit(
-        session["selected_item"],
-        session["wardrobe"],
+    trace.step(
+        "select_item",
+        returned=session["selected_item"],
+        note="branch: results found, continuing",
     )
     
-    session["fit_card"] = create_fit_card(
-        session["outfit_suggestion"],
-        session["selected_item"],
-    )
+    # session["outfit_suggestion"] = suggest_outfit(
+    #     session["selected_item"],
+    #     session["wardrobe"],
+    # )
+    
+    # session["fit_card"] = create_fit_card(
+    #     session["outfit_suggestion"],
+    #     session["selected_item"],
+    # )
+    
+    # try:
+    #     session["outfit_suggestion"] = suggest_outfit(
+    #         session["selected_item"],
+    #         session["wardrobe"],
+    #     )
+        
+    #     trace.step(
+    #         "suggest_outfit",
+    #         inputs={
+    #             "new_item": session["selected_item"],
+    #             "wardrobe": session["wardrobe"],
+    #         },
+    #     returned=session["outfit_suggestion"],
+    #     )
+
+    #     session["fit_card"] = create_fit_card(
+    #         session["outfit_suggestion"],
+    #         session["selected_item"],
+    #     )
+
+    # except ModelUnavailable:
+    #     session["error"] = (
+    #         "The AI model is currently unavailable. "
+    #         "Please try again later. If you manage the app, "
+    #         "check your Gemini API key in the .env file."
+    #     )
+
+    # return session
+    
+    try:
+        session["outfit_suggestion"] = suggest_outfit(
+            session["selected_item"],
+            session["wardrobe"],
+        )
+
+        trace.step(
+            "suggest_outfit",
+            inputs={
+                "new_item": session["selected_item"],
+                "wardrobe": session["wardrobe"],
+            },
+            returned=session["outfit_suggestion"],
+        )
+
+        session["fit_card"] = create_fit_card(
+            session["outfit_suggestion"],
+            session["selected_item"],
+        )
+
+        trace.step(
+            "create_fit_card",
+            inputs={
+                "outfit": session["outfit_suggestion"],
+                "new_item": session["selected_item"],
+            },
+            returned=session["fit_card"],
+        )
+
+    except ModelUnavailable:
+        session["error"] = (
+            "The AI model is currently unavailable. "
+            "Please try again later. If you manage the app, "
+            "check your Gemini API key in the .env file."
+        )
+
+        trace.step(
+            "model_unavailable",
+            returned=session["error"],
+            note="stopping because the model could not be reached",
+        )
+
+        return session
 
     return session
 
